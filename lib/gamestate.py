@@ -12,7 +12,11 @@ def scatter(lis, amount = 1):
   return lis
   #return [random() * amount - amount / 2 + lisi for lisi in lis]
 
+# store the serialization data, so that it doesn't have to be regenerated on
+# each gamestate objects init.
 serializeKnowledgeBase =  {}
+# store, what short name each object has
+typeKnowledgeBase = {}
 
 # this object can be used with the "with" statement to turn on the automatic
 # serialization registration magic of StateObject
@@ -33,12 +37,15 @@ class stateVars:
       self.so.statevars = self.knowndata["statevars"]
       self.so.statevars_format = self.knowndata["statevars_format"]
       self.so.tuples = self.knowndata["tuples"]
+      self.so.links = self.knowndata["links"]
     else:
       del self.so.statevars_enabled
       d = {"statevars": self.so.statevars,
            "statevars_format": self.so.statevars_format,
-           "tuples": self.so.tuples}
+           "tuples": self.so.tuples,
+           "links": self.so.links}
       serializeKnowledgeBase[type(self.so)] = d
+    typeKnowledgeBase[self.so.typename] = type(self.so)
 
 # using this object with the "with" statement, the type of the included vars
 # can be predetermined, instead of letting the magic find it out.
@@ -74,6 +81,7 @@ class GameState:
       self.deserialize(data)
 
     self.spawns = []
+    self.links = []
 
   def copy(self):
     return copy.deepcopy(self)
@@ -102,6 +110,9 @@ class GameState:
       self.spawns.append(object)
     print "spawned:", object.__repr__()
 
+  def registerLink(self, link):
+    self.links.append(link)
+
   def serialize(self):
     # serialize the whole gamestate
     data = struct.pack("!i", self.clock)
@@ -109,15 +120,9 @@ class GameState:
     return data
 
   def getSerializeType(self, dataFragment):
-    # TODO: automatically find the matching object through its 
-    #       typename property
     type, data = dataFragment[:2], dataFragment[2:]
-    if type == "sp":
-      obj = ShipState()
-    elif type == "bu":
-      obj = BulletState()
-    elif type == "ps":
-      obj = PlanetState()
+    if type in typeKnowledgeBase:
+      obj = typeKnowledgeBase[type]()
     else:
       print "got unknown type:", type.__repr__()
 
@@ -135,6 +140,7 @@ class GameState:
     # the fact, that objects gets cleared, is the reason for the GameStateProxy
     # objects to exist
     self.objects = []
+    self.links = []
     odata = data
     self.clock, data = struct.unpack("!i", data[:4])[0], data [4:]
     while len(data) > 0:
@@ -154,29 +160,15 @@ class GameState:
       obj.bind(self)
       self.objects.append(obj)
 
+    for l in self.links:
+      l.proxy_update()
+
   def getById(self, id):
     for obj in self.objects:
       if obj.id == id:
         return obj
 
     raise NotFound(id)
-
-  def doGravity(self, dt):
-    for a in self.objects:
-      for b in self.objects:
-        if b == a: continue
-
-        dv = [a.position[i] - b.position[i] for i in range(2)]
-        
-        lns = dv[0] * dv[0] + dv[1] * dv[1]
-        if lns == 0:
-          lns = 0.000001
-        con = -0.000001 * a.mass * b.mass / lns
-
-        a.speed[0] += con * dv[0] * dt
-        a.speed[1] += con * dv[1] * dt
-        b.speed[0] -= con * dv[0] * dt
-        b.speed[1] -= con * dv[1] * dt
 
   def doCollisions(self, dt):
     for a in self.objects:
@@ -205,6 +197,7 @@ class StateObject(object):
     self.state = None
     self.statevars = ["id"]
     self.tuples = []
+    self.links = []
     self.statevars_format = "!i"
     self.die = False
     self.id = 0
@@ -234,6 +227,10 @@ class StateObject(object):
           self.tuples.append(attr)
           # don't forget to add the actual tuple value for internal usage.
           raise Exception
+        elif isinstance(value, GameState) or isinstance(value, GameStateProxy):
+          addAttr("_%s_linkid" % attr, value.id)
+          self.links.append(attr)
+          raise Exception
         else:
           addAttr(attr, value)
       else:
@@ -257,6 +254,9 @@ class StateObject(object):
       thetup = object.__getattribute__(self, tup)
       for i in range(len(thetup)):
         object.__setattr__(self, "_%s_%d" % (tup, i), thetup[i])
+    for link in self.links:
+      theobj = object.__getattribute__(self, link)
+      object.__setattr__(self, "_%s_linkid" % link, theobj.id)
 
   def post_deserialize(self):
     for tup in self.tuples:
@@ -264,6 +264,13 @@ class StateObject(object):
                for i in range(len( object.__getattribute__(self, tup) )) \
             ]
       object.__setattr__(self, tup, val)
+    for link in self.links:
+      val = object.__getattribute__(self, "_%s_linkid" % link)
+      try:
+        object.__setattr__(self, link, self.state.getById(val))
+      except:
+        # no state object set yet, this state wasn't bound to a GameState yet.
+        object.__setattr__(self, link, StateObjectProxy(val, None))
 
   def serialize(self):
     self.pre_serialize()
@@ -295,12 +302,15 @@ class StateObject(object):
 # at the current instance of the object it was generated from.
 class StateObjectProxy(object):
   def __init__(self, obj, history):
-    self.proxy_id = obj.id
-    self.proxy_objref = obj
+    if isinstance(obj, StateObject) or isinstance(obj,StateObjectProxy):
+      self.proxy_id = obj.id
+      self.proxy_objref = obj
+    else:
+      raise Exception("Proxy objects must be objects.")
     history.registerProxy(self)
 
   def proxy_update(self, gamestate):
-    self.proxy_objref = gamestate.getById(self.id)
+    self.proxy_objref = gamestate.getById(self.proxy_id)
   
   # all attributes that do not have anything to do with the proxy will be
   # proxied to the StateObject
@@ -317,143 +327,23 @@ class StateObjectProxy(object):
       self.objref.__setattr__(attr, value)
 
   def __repr__(self):
-    return "<Proxy of %s>" % self.proxy_objref.__repr__()
+    return "<Proxy of (%d): %s>" % (self.proxy_id, self.proxy_objref.__repr__())
 
-class ShipState(StateObject):
-  typename = "sp"
-  mass = 1
-  def __init__(self, data = None):
-    StateObject.__init__(self)
-    with stateVars(self):
-      self.color = [random(), random(), random()]
-      self.position = [0.0, 0.0]
-      self.speed = [0.0, 0.0]        # in units per milisecond
-      self.alignment = 0.0         # from 0 to 1
-      self.timeToReload = 0      # in miliseconds
-      self.reloadInterval = 500
-      self.maxShield = 7500
-      self.shield = 7500
-      self.hull = 10000
-      with prescribedType(self, "b"):
-        self.team = 0
+# the Link class is basically like a StateObjectProxy, but limited to
+# one gamestate, rather than the history. it is managed by the GameState.
 
-    self.size = 2
-    self.firing = 0
-    self.turning = 0
-    self.thrust = 0
+class Link(GameStateProxy):
+  def __init__(self, obj):
+    self.proxy_id = obj.id
+    self.proxy_objref = obj
 
-    if data:
-      self.deserialize(data)
+    obj.state.registerLink(self)
+
+  def proxy_update(self):
+    self.proxy_objref = self.proxy_objref.state.getById(self.proxy_id)
 
   def __repr__(self):
-    return "<ShipState at %s, team %d, id %d>" % (self.position, self.team, self.id)
-
-  def tick(self, dt):
-    self.position[0] += self.speed[0] * dt
-    self.position[1] += self.speed[1] * dt
-    self.speed[0] *= 0.95 ** (dt * 0.01)
-    self.speed[1] *= 0.95 ** (dt * 0.01)
-
-    self.alignment += self.turning * dt * 0.0007
-    self.turning = 0
-
-    if self.thrust:
-      self.speed = [self.speed[0] + cos(self.alignment * pi * 2) * 0.001, self.speed[1] + sin(self.alignment * pi * 2) * 0.001]
-      self.thrust = 0
-
-    if self.timeToReload > 0:
-      self.timeToReload = max(0, self.timeToReload - dt)
-    
-    if self.firing and self.timeToReload == 0:
-      bul = BulletState()
-      face = scatter([cos(self.alignment * pi * 2) * 0.02, sin(self.alignment * pi * 2) * 0.02], 0.002)
-      bul.position = [self.position[0] + face[0], self.position[1] + face[1]]
-      bul.speed = [face[0] + self.speed[0], face[1] + self.speed[1]]
-      bul.team = self.team
-      self.state.spawn(bul, True)
-      self.timeToReload = self.reloadInterval
-      self.firing = False
-
-    if self.shield < self.maxShield:
-      self.shield += dt
-    else:
-      self.shield = self.maxShield
-
-  def hitShield(self, damage = 1000):
-    if self.shield < damage:
-      self.shield, damage = 0, damage - self.shield
-    else:
-      self.shield, damage = self.shield - damage, 0
-
-    self.hull -= damage
-
-  def collide(self, other, vec):
-    if other.typename == "bu":
-      if other.team != self.team:
-        if vec[0] != 0 and vec[1] != 0:
-          len = sqrt(vec[0] * vec[0] + vec[1] * vec[1])
-          self.speed[0] += vec[0] / len
-          self.speed[1] += vec[1] / len
-        self.hitShield()
-
-  def command(self, cmd):
-    if   cmd == "l": self.turning = -1
-    elif cmd == "r": self.turning = 1
-    elif cmd == "t": self.thrust = 1
-    elif cmd == "f": self.firing = True
-
-class BulletState(StateObject):
-  typename = "bu"
-  mass = -0.5
-  def __init__(self, data = None):
-    StateObject.__init__(self)
-    with stateVars(self):
-      self.position = [0., 0.]
-      self.speed = [0., 0.]
-      self.lifetime = 10000
-      with prescribedType(self, "b"):
-        self.team = 0
-
-    self.state = None
-    self.size = 1
-   
-    if data:
-      self.deserialize(data)
-
-  def tick(self, dt):
-    self.position[0] += self.speed[0] * dt
-    self.position[1] += self.speed[1] * dt
-    self.lifetime -= dt
-    if self.lifetime <= 0:
-      self.die = True
-
-  def collide(self, other, vec):
-    if other.typename == self.typename:
-      return
-    try:
-      if other.team != self.team:
-        self.die = True
-    except:
-      self.die = True
-
-class PlanetState(StateObject):
-  typename = "ps"
-  mass = 30
-  def __init__(self, data = None):
-    StateObject.__init__(self)
-
-    with stateVars(self):
-      self.position = [0.0, 0.0]
-      self.speed = [0.0, 0.0]
-      self.color = [random(), random(), random()]
-      self.size = 6
-      with prescribedType(self, "b"):
-        self.team = -1
-
-    self.state = None
-
-    if data:
-      self.deserialize(data)
+    return "<Link to (%d): %s>" % (self.proxy_id, self.proxy_objref.__repr__())
 
 # the StateHistory object saves a backlog of GameState objects in order to
 # interpret input data at the time it happened, even if received with a
