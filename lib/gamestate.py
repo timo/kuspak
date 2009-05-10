@@ -77,6 +77,7 @@ class GameState:
     self.tickinterval = 50 # in miliseconds
     self.clock = 0
     self.nextNewId = 0
+    self.links = []
     if data:
       self.deserialize(data)
 
@@ -109,6 +110,9 @@ class GameState:
       self.spawns.append(object)
     print "spawned:", object.__repr__()
 
+  def registerLink(self, link):
+    self.links.append(link)
+
   def serialize(self):
     # serialize the whole gamestate
     data = struct.pack("!i", self.clock)
@@ -116,8 +120,6 @@ class GameState:
     return data
 
   def getSerializeType(self, dataFragment):
-    # TODO: automatically find the matching object through its 
-    #       typename property
     type, data = dataFragment[:2], dataFragment[2:]
     if type in typeKnowledgeBase:
       obj = typeKnowledgeBase[type]()
@@ -135,7 +137,7 @@ class GameState:
   def deserialize(self, data):
     # deserialize the data
 
-    # the fact, that objects gets cleared, is the reason for the GameStateProxy
+    # the fact, that objects gets cleared, is the reason for the StateObjectProxy
     # objects to exist
     self.objects = []
     self.work = []
@@ -158,19 +160,23 @@ class GameState:
 
       self.objects.append(obj)
       try:
-        self.work.append(obj.work)
+        self.work.extend(obj.work)
       except: pass
 
     for work in self.work:
-      print "work!"
       work()
     self.work = []
+
+    for l in self.links:
+      l.proxy_update()
 
   def getById(self, id):
     for obj in self.objects:
       if obj.id == id:
         return obj
 
+    if id == -1:
+      return EmptyLinkTarget()
     raise NotFound(id)
 
   def doCollisions(self, dt):
@@ -230,7 +236,7 @@ class StateObject(object):
           self.tuples.append(attr)
           # don't forget to add the actual tuple value for internal usage.
           raise Exception
-        elif isinstance(value, GameState) or isinstance(value, GameStateProxy):
+        elif isinstance(value, GameState) or isinstance(value, Link):
           addAttr("_%s_linkid" % attr, value.id)
           self.links.append(attr)
           raise Exception
@@ -240,7 +246,7 @@ class StateObject(object):
         # this is usually called when statevars_enabled is not set.
         raise Exception
 
-    except:
+    except Exception:
       object.__setattr__(self, attr, value)
 
   # the base class does nothing by itself.
@@ -270,15 +276,20 @@ class StateObject(object):
     for link in self.links:
       val = object.__getattribute__(self, "_%s_linkid" % link)
       try:
-        object.__setattr__(self, link, self.state.getById(val))
+        object.__setattr__(self, link, Link(self.state.getById(val)))
       # if we don't have a state bound yet or if the other object has not yet
       # been deserialized, we let the gamestate do the setup later
       except (NotFound, AttributeError): 
-        fun = lambda: object.__setattr__(self, link, self.state.getById(val)))
+        fun = lambda: object.__setattr__(self, link, Link(self.state.getById(val)))
         try:
           self.work.append(fun)
         except AttributeError:
           self.work = [fun]
+
+  # this function can be used to set up data from the games "database"
+  # items, for example.
+  def translateSerializedData(self):
+    pass
 
   def serialize(self):
     self.pre_serialize()
@@ -310,12 +321,19 @@ class StateObject(object):
 # at the current instance of the object it was generated from.
 class StateObjectProxy(object):
   def __init__(self, obj, history):
-    self.proxy_id = obj.id
-    self.proxy_objref = obj
+    if isinstance(obj, StateObject) or isinstance(obj,StateObjectProxy):
+      self.proxy_id = obj.id
+      self.proxy_objref = obj
+    else:
+      raise Exception("Proxy objects must be objects.")
     history.registerProxy(self)
 
+  def proxy_set(self, obj):
+    self.proxy_id = obj.id
+    self.proxy_objref = obj
+
   def proxy_update(self, gamestate):
-    self.proxy_objref = gamestate.getById(self.id)
+    self.proxy_objref = gamestate.getById(self.proxy_id)
   
   # all attributes that do not have anything to do with the proxy will be
   # proxied to the StateObject
@@ -332,7 +350,41 @@ class StateObjectProxy(object):
       self.objref.__setattr__(attr, value)
 
   def __repr__(self):
-    return "<Proxy of %s>" % self.proxy_objref.__repr__()
+    return "<Proxy of (%d): %s>" % (self.proxy_id, self.proxy_objref.__repr__())
+
+# the Link class is basically like a StateObjectProxy, but limited to
+# one gamestate, rather than the history. it is managed by the GameState.
+
+class StateStub:
+  def getById(self, id):
+    return EmptyLinkTarget()
+  
+  def registerLink(self,link):
+    pass
+
+class EmptyLinkTarget(object):
+  def __init__(self):
+    self.id = -1
+    self.state = StateStub()
+
+class Link(StateObjectProxy):
+  def __init__(self, obj = None):
+    if obj:
+      self.proxy_id = obj.id
+      self.proxy_objref = obj
+      obj.state.registerLink(self)
+    else:
+      self.proxy_objref = EmptyLinkTarget()
+      self.proxy_id = None
+
+  def proxy_update(self):
+    self.proxy_objref = self.proxy_objref.state.getById(self.proxy_id)
+
+  def __repr__(self):
+    if isinstance(self.proxy_objref, EmptyLinkTarget):
+      return "<Link to Nothing>"
+    else:
+      return "<Link to (%d): %s>" % (self.proxy_id, self.proxy_objref.__repr__())
 
 # the StateHistory object saves a backlog of GameState objects in order to
 # interpret input data at the time it happened, even if received with a

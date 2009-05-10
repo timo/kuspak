@@ -1,4 +1,6 @@
-from gamestate import StateObject, stateVars, prescribeType, Link
+from __future__ import with_statement
+from gamestate import StateObject, stateVars, prescribedType, Link
+from items import itemDb
 
 class PlayerState(StateObject):
   typename = "pc"
@@ -19,7 +21,7 @@ class PlayerState(StateObject):
       self.deserialize(data)
 
   def __repr__(self):
-    return "<ShipState at %s, team %d, id %d>" % (self.position, self.team, self.id)
+    return "<PlayerState H%f/%d M%f/%d holding %s>" % (self.health, self.maxHealth, self.magic, self.maxMagic, self.item.__repr__())
 
   def tick(self, dt):
     pass
@@ -30,13 +32,17 @@ class PlayerState(StateObject):
   def command(self, cmd):
     pass
 
-
-class Item(StateObject):
+class ItemState(StateObject):
   typename = "it"
   def __init__(self, statedata = None):
     StateObject.__init__(self)
     with stateVars(self):
-      self.name = ""
+      self.itemType = 0
+      self.grantType = 0
+      self.mod = 0
 
     if statedata:
       self.deserialize(statedata)
+  
+  def translateSerializedData(self):
+    itemDb.initItem(self)
