@@ -1,27 +1,19 @@
-from gamestate import StateObject, stateVars, prescribeType
+from gamestate import StateObject, stateVars, prescribeType, Link
 
 class PlayerState(StateObject):
-  typename = "sp"
-  mass = 1
+  typename = "pc"
   def __init__(self, data = None):
     StateObject.__init__(self)
     with stateVars(self):
-      self.color = [random(), random(), random()]
       self.position = [0.0, 0.0]
-      self.speed = [0.0, 0.0]        # in units per milisecond
       self.alignment = 0.0         # from 0 to 1
-      self.timeToReload = 0      # in miliseconds
-      self.reloadInterval = 500
-      self.maxShield = 7500
-      self.shield = 7500
-      self.hull = 10000
+      self.health = 20.0
+      self.maxHealth = 20
+      self.magic = 10.0
+      self.maxMagic = 10
+      self.item = Link()
       with prescribedType(self, "b"):
         self.team = 0
-
-    self.size = 2
-    self.firing = 0
-    self.turning = 0
-    self.thrust = 0
 
     if data:
       self.deserialize(data)
@@ -37,3 +29,14 @@ class PlayerState(StateObject):
 
   def command(self, cmd):
     pass
+
+
+class Item(StateObject):
+  typename = "it"
+  def __init__(self, statedata = None):
+    StateObject.__init__(self)
+    with stateVars(self):
+      self.name = ""
+
+    if statedata:
+      self.deserialize(statedata)

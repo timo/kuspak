@@ -138,6 +138,7 @@ class GameState:
     # the fact, that objects gets cleared, is the reason for the GameStateProxy
     # objects to exist
     self.objects = []
+    self.work = []
     odata = data
     self.clock, data = struct.unpack("!i", data[:4])[0], data [4:]
     while len(data) > 0:
@@ -148,14 +149,22 @@ class GameState:
       objlen = struct.calcsize(obj.statevars_format)
       objdat, data = data[:objlen], data[objlen:]
 
+      obj.bind(self)
       try:
         obj.deserialize(objdat)
       except:
         print "could not deserialize", odata.__repr__(), "- chunk:", objdat.__repr__()
         raise
 
-      obj.bind(self)
       self.objects.append(obj)
+      try:
+        self.work.append(obj.work)
+      except: pass
+
+    for work in self.work:
+      print "work!"
+      work()
+    self.work = []
 
   def getById(self, id):
     for obj in self.objects:
@@ -261,7 +270,15 @@ class StateObject(object):
     for link in self.links:
       val = object.__getattribute__(self, "_%s_linkid" % link)
       try:
-        
+        object.__setattr__(self, link, self.state.getById(val))
+      # if we don't have a state bound yet or if the other object has not yet
+      # been deserialized, we let the gamestate do the setup later
+      except (NotFound, AttributeError): 
+        fun = lambda: object.__setattr__(self, link, self.state.getById(val)))
+        try:
+          self.work.append(fun)
+        except AttributeError:
+          self.work = [fun]
 
   def serialize(self):
     self.pre_serialize()
