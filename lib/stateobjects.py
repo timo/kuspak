@@ -1,6 +1,6 @@
 from __future__ import with_statement
 from gamestate import StateObject, stateVars, prescribedType, Link
-from items import itemDb
+from stuffdb import itemDb
 
 class PlayerState(StateObject):
   typename = "pc"
@@ -37,12 +37,32 @@ class ItemState(StateObject):
   def __init__(self, statedata = None):
     StateObject.__init__(self)
     with stateVars(self):
-      self.itemType = 0
+      self.type = 0
       self.grantType = 0
       self.mod = 0
 
     if statedata:
       self.deserialize(statedata)
+    else:
+      self.translateSerializedData()
   
   def translateSerializedData(self):
     itemDb.initItem(self)
+
+class IntrinsicState(StateObject):
+  typename = "in"
+  def __init__(self, statedata = None):
+    StateObject.__init__(self)
+    with stateVars(self):
+      self.type = 0
+      self.lifetimeLeft = -1
+
+    if statedata:
+      self.deserialize(statedata)
+    else:
+      self.translateSerializedData()
+
+  def tick(self, dt):
+    self.lifetimeLeft -= dt
+    if self.lifetimeLeft < 0:
+      self.die = True

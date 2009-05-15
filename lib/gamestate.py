@@ -43,7 +43,8 @@ class stateVars:
       d = {"statevars": self.so.statevars,
            "statevars_format": self.so.statevars_format,
            "tuples": self.so.tuples,
-           "links": self.so.links}
+           "links": self.so.links,
+           "len": struct.calcsize(self.so.statevars_format}
       serializeKnowledgeBase[type(self.so)] = d
     typeKnowledgeBase[self.so.typename] = type(self.so)
 
@@ -108,7 +109,7 @@ class GameState:
     self.objects.append(object.bind(self))
     if not obvious:
       self.spawns.append(object)
-    print "spawned:", object.__repr__()
+    print "spawned:", `object`
 
   def registerLink(self, link):
     self.links.append(link)
@@ -124,13 +125,16 @@ class GameState:
     if type in typeKnowledgeBase:
       obj = typeKnowledgeBase[type]()
     else:
-      print "got unknown type:", type.__repr__()
+      print "got unknown type:", `type`
 
     return obj
 
   def getSerializedLen(self, dataFragment):
     if isinstance(dataFragment, str):
-      return struct.calcsize(self.getSerializeType(dataFragment).statevars_format)
+      try:
+        return serializeKnowledgeBase[self.getSerializeType(dataFragment)]["len"]
+      except IndexError:
+        return struct.calcsize(self.getSerializeType(dataFragment).statevars_format)
     else:
       return struct.calcsize(dataFragment.statevars_format)
 
@@ -155,7 +159,7 @@ class GameState:
       try:
         obj.deserialize(objdat)
       except:
-        print "could not deserialize", odata.__repr__(), "- chunk:", objdat.__repr__()
+        print "could not deserialize", `odata`, "- chunk:", `objdat`
         raise
 
       self.objects.append(obj)
@@ -302,11 +306,14 @@ class StateObject(object):
     try:
       vals = struct.unpack(self.statevars_format, data)
     except:
-      print "error while unpacking a", self.typename, self.__repr__()
+      print "error while unpacking a", self.typename, `self`
       raise
     for k, v in zip(self.statevars, vals):
       setattr(self, k, v)
+    
     self.post_deserialize()
+
+    self.translateSerializedData()
 
     return self
 
@@ -350,7 +357,7 @@ class StateObjectProxy(object):
       self.objref.__setattr__(attr, value)
 
   def __repr__(self):
-    return "<Proxy of (%d): %s>" % (self.proxy_id, self.proxy_objref.__repr__())
+    return "<Proxy of (%d): %s>" % (self.proxy_id, `self.proxy_objref`)
 
 # the Link class is basically like a StateObjectProxy, but limited to
 # one gamestate, rather than the history. it is managed by the GameState.
@@ -384,7 +391,7 @@ class Link(StateObjectProxy):
     if isinstance(self.proxy_objref, EmptyLinkTarget):
       return "<Link to Nothing>"
     else:
-      return "<Link to (%d): %s>" % (self.proxy_id, self.proxy_objref.__repr__())
+      return "<Link to (%d): %s>" % (self.proxy_id, `self.proxy_objref`)
 
 # the StateHistory object saves a backlog of GameState objects in order to
 # interpret input data at the time it happened, even if received with a
