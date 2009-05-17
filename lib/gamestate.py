@@ -46,7 +46,6 @@ class stateVars:
            "links": self.so.links,
            "len": struct.calcsize(self.so.statevars_format}
       serializeKnowledgeBase[type(self.so)] = d
-    typeKnowledgeBase[self.so.typename] = type(self.so)
 
 # using this object with the "with" statement, the type of the included vars
 # can be predetermined, instead of letting the magic find it out.
@@ -152,7 +151,12 @@ class GameState:
       data = data[2:]
 
       # cut the next N bytes out of the data.
-      objlen = struct.calcsize(obj.statevars_format)
+      if isinstance(obj, LinkList):
+        # the first integer of the thingie is the number of items in the list,
+        # so we add 4 bytes for the first integer and 4 for each following one.
+        objlen = struct.unpack("!2i", data[:8])[1] * 4 + 4
+      else:
+        objlen = self.getSerializedLen(data)
       objdat, data = data[:objlen], data[objlen:]
 
       obj.bind(self)
@@ -392,6 +396,34 @@ class Link(StateObjectProxy):
       return "<Link to Nothing>"
     else:
       return "<Link to (%d): %s>" % (self.proxy_id, `self.proxy_objref`)
+
+class LinkList(StateObject):
+  typename = "ll"
+  def __init__(self, statedata):
+    self.links = []
+    self.work = []
+    self.state = None
+    self.id = 0
+
+    if statedata:
+      self.deserialize(statedata)
+
+  def serialize(self):
+    pass
+
+  def deserialize(self, data):
+    self.id, amount = struct.unpack("!2i", data[:8])
+    while data:
+      chunk, data = data[:4], data[4:]
+      self.work.append(lambda: self.links.append(Link(self.state.getById(struct.unpack("!i", chunk)))))
+
+    if self.state:
+      for wo in self.work:
+        wo()
+      self.work = []
+
+  def pre_serialize(self): pass
+  def post_deserialize(self): pass
 
 # the StateHistory object saves a backlog of GameState objects in order to
 # interpret input data at the time it happened, even if received with a

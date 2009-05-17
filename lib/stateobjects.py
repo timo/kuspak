@@ -1,5 +1,5 @@
 from __future__ import with_statement
-from gamestate import StateObject, stateVars, prescribedType, Link
+from gamestate import StateObject, stateVars, prescribedType, Link, typeKnowledgeBase
 from stuffdb import itemDb
 
 class PlayerState(StateObject):
@@ -32,6 +32,8 @@ class PlayerState(StateObject):
   def command(self, cmd):
     pass
 
+typeKnowledgeBase["pc"] = PlayerState
+
 class ItemState(StateObject):
   typename = "it"
   def __init__(self, statedata = None):
@@ -48,6 +50,8 @@ class ItemState(StateObject):
   
   def translateSerializedData(self):
     itemDb.initItem(self)
+
+typeKnowledgeBase["it"] = ItemState
 
 class IntrinsicState(StateObject):
   typename = "in"
@@ -66,3 +70,5 @@ class IntrinsicState(StateObject):
     self.lifetimeLeft -= dt
     if self.lifetimeLeft < 0:
       self.die = True
+
+typeKnowledgeBase["in"] = IntrinsicState
