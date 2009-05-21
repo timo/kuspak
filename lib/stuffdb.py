@@ -12,15 +12,20 @@ class objectdb(object):
 itemDb = objectdb()
 
 class Item(object):
+  drink = None
+  equip = None
+  meleeDamage = 1
   def assimilate(self, other):
     other.melee = self.melee
-    other.thrown = self.thrown
-    other.thrownDistance =
+    other.drink = self.drink
+    other.equip = self.equip
   
   def melee(self, user):
-    
+    dmg = 0
+    if user.hasIntrinsic(self.meleeIntrinsic):
+      dmg += 1
+    return self.meleeDamage + dmg
 
 class Weapon(Item):
   def __init__(self):
-    
-  
+    pass

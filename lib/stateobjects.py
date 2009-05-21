@@ -1,5 +1,5 @@
 from __future__ import with_statement
-from gamestate import StateObject, stateVars, prescribedType, Link, typeKnowledgeBase
+from gamestate import StateObject, stateVars, prescribedType, Link
 from stuffdb import itemDb
 
 class PlayerState(StateObject):
@@ -13,7 +13,7 @@ class PlayerState(StateObject):
       self.maxHealth = 20
       self.magic = 10.0
       self.maxMagic = 10
-      self.item = Link()
+      self.items = Link()
       with prescribedType(self, "b"):
         self.team = 0
 
@@ -21,7 +21,7 @@ class PlayerState(StateObject):
       self.deserialize(data)
 
   def __repr__(self):
-    return "<PlayerState H%f/%d M%f/%d holding %s>" % (self.health, self.maxHealth, self.magic, self.maxMagic, self.item.__repr__())
+    return "<PlayerState H%f/%d M%f/%d holding %s>" % (self.health, self.maxHealth, self.magic, self.maxMagic, `self.items`)
 
   def tick(self, dt):
     pass
@@ -31,8 +31,6 @@ class PlayerState(StateObject):
 
   def command(self, cmd):
     pass
-
-typeKnowledgeBase["pc"] = PlayerState
 
 class ItemState(StateObject):
   typename = "it"
@@ -49,9 +47,8 @@ class ItemState(StateObject):
       self.translateSerializedData()
   
   def translateSerializedData(self):
-    itemDb.initItem(self)
-
-typeKnowledgeBase["it"] = ItemState
+    pass
+    #itemDb.initItem(self)
 
 class IntrinsicState(StateObject):
   typename = "in"
@@ -70,5 +67,3 @@ class IntrinsicState(StateObject):
     self.lifetimeLeft -= dt
     if self.lifetimeLeft < 0:
       self.die = True
-
-typeKnowledgeBase["in"] = IntrinsicState

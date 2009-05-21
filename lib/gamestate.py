@@ -25,6 +25,8 @@ class stateVars:
     global serializeKnowledgeBase
     if type(other) in serializeKnowledgeBase:
       self.knowndata = serializeKnowledgeBase[type(other)]
+    if other.typename not in typeKnowledgeBase:
+      typeKnowledgeBase[other.typename] = type(other)
     self.so = other
 
   def __enter__(self):
@@ -44,7 +46,7 @@ class stateVars:
            "statevars_format": self.so.statevars_format,
            "tuples": self.so.tuples,
            "links": self.so.links,
-           "len": struct.calcsize(self.so.statevars_format}
+           "len": struct.calcsize(self.so.statevars_format)}
       serializeKnowledgeBase[type(self.so)] = d
 
 # using this object with the "with" statement, the type of the included vars
@@ -121,10 +123,11 @@ class GameState:
 
   def getSerializeType(self, dataFragment):
     type, data = dataFragment[:2], dataFragment[2:]
+    print `dataFragment`, `type`, `data`
     if type in typeKnowledgeBase:
-      obj = typeKnowledgeBase[type]()
+      obj = typeKnowledgeBase[type]
     else:
-      print "got unknown type:", `type`
+      print "got unknown type:", `type`, `typeKnowledgeBase`
 
     return obj
 
@@ -147,20 +150,25 @@ class GameState:
     odata = data
     self.clock, data = struct.unpack("!i", data[:4])[0], data [4:]
     while len(data) > 0:
+      print "string is:", `data`
       obj = self.getSerializeType(data)
-      data = data[2:]
 
       # cut the next N bytes out of the data.
-      if isinstance(obj, LinkList):
+      if obj == LinkList:
         # the first integer of the thingie is the number of items in the list,
         # so we add 4 bytes for the first integer and 4 for each following one.
-        objlen = struct.unpack("!2i", data[:8])[1] * 4 + 4
+        print struct.unpack("!2i", data[2:10])
+        objlen = struct.unpack("!2i", data[2:10])[1] * 4 + 8
       else:
         objlen = self.getSerializedLen(data)
+      data = data[2:]
       objdat, data = data[:objlen], data[objlen:]
+
+      obj = obj()
 
       obj.bind(self)
       try:
+        print "deserializing a", `obj`, "from", `objdat`
         obj.deserialize(objdat)
       except:
         print "could not deserialize", `odata`, "- chunk:", `objdat`
@@ -204,6 +212,8 @@ class GameState:
     for id, cmd in commands:
       self.getById(id).command(cmd)
 
+  def __repr__(self):
+    return "<GameState at clock %d containing: %s>" % (self.clock, `self.objects`)
 
 # the base class for a State Object, that also implements the serialization
 # black magic.
@@ -399,7 +409,7 @@ class Link(StateObjectProxy):
 
 class LinkList(StateObject):
   typename = "ll"
-  def __init__(self, statedata):
+  def __init__(self, statedata = None):
     self.links = []
     self.work = []
     self.state = None
@@ -409,21 +419,39 @@ class LinkList(StateObject):
       self.deserialize(statedata)
 
   def serialize(self):
-    pass
+    data = struct.pack("!2i", self.id, len(self.links))
+    data += struct.pack(*(["!" + str(len(self.links)) + "i"] + [link.id for link in self.links]))
+    return data
 
   def deserialize(self, data):
     self.id, amount = struct.unpack("!2i", data[:8])
+    data = data[8:]
+    del self.links[:]
     while data:
       chunk, data = data[:4], data[4:]
-      self.work.append(lambda: self.links.append(Link(self.state.getById(struct.unpack("!i", chunk)))))
-
-    if self.state:
-      for wo in self.work:
-        wo()
-      self.work = []
+      print "adding", `chunk`
+      self.work.append(lambda: self.links.append(Link(self.state.getById(struct.unpack("!i", chunk)[0]))))
 
   def pre_serialize(self): pass
   def post_deserialize(self): pass
+
+  def assureLink(self, v):
+    if isinstance(v, Link):
+      return v
+    else:
+      return Link(v)
+
+  def __setitem__(self, x, v):
+    self.links[x] = self.assureLink(v)
+
+  def __getitem__(self, x): return self.links[x]
+  def __delitem__(self, x): del self.links[x]
+  def append(self, v):  self.links.append(self.assureLink(v))
+
+  def __repr__(self):
+    return "<LinkList of %s>" % (`self.links`)
+
+typeKnowledgeBase["ll"] = LinkList
 
 # the StateHistory object saves a backlog of GameState objects in order to
 # interpret input data at the time it happened, even if received with a
