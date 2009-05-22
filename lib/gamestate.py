@@ -403,9 +403,9 @@ class Link(StateObjectProxy):
 
   def __repr__(self):
     if isinstance(self.proxy_objref, EmptyLinkTarget):
-      return "<Link to Nothing>"
+      return "|-> None <-|"
     else:
-      return "<Link to (%d): %s>" % (self.proxy_id, `self.proxy_objref`)
+      return "|-> (%d): %s <-|" % (self.proxy_id, `self.proxy_objref`)
 
 class LinkList(StateObject):
   typename = "ll"
