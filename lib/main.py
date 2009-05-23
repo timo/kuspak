@@ -128,7 +128,7 @@ def rungame():
   if mode == "c":
     # this is used to fix the camera on the ship and display information about
     # his ship to the player.
-    mystateid = network.clients[None].shipid
+    mystateid = network.clients[None].stateid
     # a proxy is an object, that will automatically be updated by the gamestate
     # history object to always reflect the current object. This is accomplished
     # with black magic.

@@ -3,6 +3,7 @@ from socket import *
 from gamestate import *
 from select import select
 from timing import timer
+import stateobjects
 
 TYPE_STATE = "g"
 TYPE_SHAKE = "c"
@@ -222,7 +223,7 @@ def pumpEvents():
             elif msg[1] == SHAKE_AUTH:
               print "got a shake_auth."
 
-              a = stateobjects.playerStartup(sender.name, main.gsh[-1]
+              a = stateobjects.playerStartup(sender.name, main.gsh[-1])
 
               sender.stateid = a.id
               print "sending a your-id-package"
@@ -315,10 +316,14 @@ def pumpEvents():
             while data:
               objtype, data = data[:2], data[2:]
               obj = main.gsh[-1].getSerializeType(objtype)
-              ln = main.gsh[-1].getSerializedLen(obj)
+              if obj == LinkList:
+                ln = struct.unpack("!2i", data[:8])[1] * 4 + 8
+              else:
+                ln = main.gsh[-1].getSerializedLen(obj)
               objdat, data = data[:ln], data[ln:]
               print "trying to spawn:", objdat.__repr__(), "at", clock
-              obj.deserialize(objdat)
+              found = main.gsh.byClock(clock)
+              obj = obj(main.gsh[found], objdat)
               print "got obj with id", obj.id
               try:
                 if main.gsh[-1].getById(obj.id): 

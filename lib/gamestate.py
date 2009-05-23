@@ -80,10 +80,9 @@ class GameState:
     self.clock = 0
     self.nextNewId = 0
     self.links = []
+    self.spawns = []
     if data:
       self.deserialize(data)
-
-    self.spawns = []
 
   def copy(self):
     return copy.deepcopy(self)
@@ -110,6 +109,7 @@ class GameState:
     if not obvious:
       self.spawns.append(object)
     print "spawned:", `object`
+    return object
 
   def registerLink(self, link):
     self.links.append(link)
@@ -134,10 +134,13 @@ class GameState:
     if isinstance(dataFragment, str):
       try:
         return serializeKnowledgeBase[self.getSerializeType(dataFragment)]["len"]
-      except IndexError:
+      except KeyError:
         return struct.calcsize(self.getSerializeType(dataFragment).statevars_format)
     else:
-      return struct.calcsize(dataFragment.statevars_format)
+      try:
+        return struct.calcsize(dataFragment.statevars_format)
+      except AttributeError:
+        raise Exception("getSerializedLen called on a LinkList?")
 
   def deserialize(self, data):
     # deserialize the data
@@ -156,16 +159,13 @@ class GameState:
       if obj == LinkList:
         # the first integer of the thingie is the number of items in the list,
         # so we add 4 bytes for the first integer and 4 for each following one.
-        print struct.unpack("!2i", data[2:10])
         objlen = struct.unpack("!2i", data[2:10])[1] * 4 + 8
       else:
         objlen = self.getSerializedLen(data)
       data = data[2:]
       objdat, data = data[:objlen], data[objlen:]
 
-      obj = obj()
-
-      obj.bind(self)
+      obj = obj(self)
       try:
         print "deserializing a", `obj`, "from", `objdat`
         obj.deserialize(objdat)
@@ -198,13 +198,15 @@ class GameState:
     for a in self.objects:
       for b in self.objects:
         if a == b: continue
+        try:
+          dv = [a.position[i] - b.position[i] for i in range(2)]
+          lns = dv[0] * dv[0] + dv[1] * dv[1]
 
-        dv = [a.position[i] - b.position[i] for i in range(2)]
-        lns = dv[0] * dv[0] + dv[1] * dv[1]
-
-        if lns < (a.size + b.size) ** 2:
-          a.collide(b, dv)
-          b.collide(a, dv)
+          if lns < (a.size + b.size) ** 2:
+            a.collide(b, dv)
+            b.collide(a, dv)
+        except AttributeError:
+          pass # Links and LinkLists do not collide.
 
   def control(self, commands):
     # relays control messages to the objects.
@@ -219,14 +221,14 @@ class GameState:
 class StateObject(object):
   typename = "ab"#stract
   mass = 0
-  def __init__(self):
-    self.state = None
+  def __init__(self, state):
     self.statevars = ["id"]
     self.tuples = []
     self.links = []
     self.statevars_format = "!i"
     self.die = False
     self.id = 0
+    self.bind(state)
 
   def __setattr__(self, attr, value):
 
@@ -408,11 +410,12 @@ class Link(StateObjectProxy):
 
 class LinkList(StateObject):
   typename = "ll"
-  def __init__(self, statedata = None):
+  def __init__(self, state, statedata = None):
     self.links = []
     self.work = []
-    self.state = None
     self.id = 0
+    self.die = False
+    self.state = state
 
     if statedata:
       self.deserialize(statedata)
@@ -499,7 +502,10 @@ class StateHistory:
       found = len(self.gsh) -1
 
     self.firstDirty = found
-    self.gsh[found].spawn(object, True)
+    if isinstance(object, tuple):
+      self.gsh[found].spawn(object[0](self.gsh[found], object[1]), True)
+    else:
+      self.gsh[found].spawn(object, True)
 
   def updateObject(self, id, data, clock = None):
     if clock:

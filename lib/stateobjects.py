@@ -1,21 +1,16 @@
 from __future__ import with_statement
-from gamestate import StateObject, stateVars, prescribedType, Link
+from gamestate import GameState, StateObject, stateVars, prescribedType, Link, LinkList, typeKnowledgeBase
 from stuffdb import itemDb
 
 def playerStartup(name, state):
-  plr = PlayerState()
-  state.spawn(plr)
-  inv = LinkList()
-  state.spawn(inv)
-  ite = ItemState()
-  state.spawn(ite)
-  inv.append(ite)
+  plr = state.spawn(PlayerState(state))
+  plr.items.append(state.spawn(ItemState(state)))
   return plr
 
 class PlayerState(StateObject):
   typename = "pc"
-  def __init__(self, data = None):
-    StateObject.__init__(self)
+  def __init__(self, state, data = None):
+    StateObject.__init__(self, state)
     with stateVars(self):
       self.position = [0.0, 0.0]
       self.alignment = 0.0         # from 0 to 1
@@ -23,7 +18,8 @@ class PlayerState(StateObject):
       self.maxHealth = 20
       self.magic = 10.0
       self.maxMagic = 10
-      self.items = Link()
+      self.items = Link(state.spawn(LinkList(state)))
+      self.intrins = Link(state.spawn(LinkList(state)))
       with prescribedType(self, "b"):
         self.team = 0
 
@@ -42,10 +38,12 @@ class PlayerState(StateObject):
   def command(self, cmd):
     pass
 
+PlayerState(GameState())
+
 class ItemState(StateObject):
   typename = "it"
-  def __init__(self, statedata = None):
-    StateObject.__init__(self)
+  def __init__(self, state, statedata = None):
+    StateObject.__init__(self, state)
     with stateVars(self):
       self.type = 0
       self.grantType = 0
@@ -60,10 +58,12 @@ class ItemState(StateObject):
     pass
     #itemDb.initItem(self)
 
+ItemState(GameState())
+
 class IntrinsicState(StateObject):
   typename = "in"
-  def __init__(self, statedata = None):
-    StateObject.__init__(self)
+  def __init__(self, state, statedata = None):
+    StateObject.__init__(self, state)
     with stateVars(self):
       self.type = 0
       self.lifetimeLeft = -1
@@ -77,3 +77,5 @@ class IntrinsicState(StateObject):
     self.lifetimeLeft -= dt
     if self.lifetimeLeft < 0:
       self.die = True
+
+IntrinsicState(GameState())

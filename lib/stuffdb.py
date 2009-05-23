@@ -1,6 +1,6 @@
 class objectdb(object):
   def __init__(self):
-    db = {}
+    self.db = {}
 
   def register(self, cls, typeId):
     self.db[typeId] = cls
@@ -10,6 +10,7 @@ class objectdb(object):
     self.db[obj.type].assimilate(item)
 
 itemDb = objectdb()
+intrinsicDb = objectdb()
 
 class Item(object):
   drink = None
@@ -29,3 +30,16 @@ class Item(object):
 class Weapon(Item):
   def __init__(self):
     pass
+
+def basicIntrinsic(intName):
+  class myIntrinsic(object):
+    name = intName
+    lifetime = None
+  intrinsicDb.register(myIntrinsic, len(intrinsicDb.db))
+
+basicIntrinsic("Fire Resistance")
+basicIntrinsic("Cold Resistance")
+basicIntrinsic("Acid Resistance")
+basicIntrinsic("Spark Resistance")
+basicIntrinsic("Quick")
+basicIntrinsic("Alert")
