@@ -97,7 +97,6 @@ class GameState:
       if o.die:
         self.objects.remove(o)
 
-    self.doGravity(self.tickinterval)
     self.doCollisions(self.tickinterval)
 
   def spawn(self, object, obvious=False):

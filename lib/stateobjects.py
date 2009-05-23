@@ -2,6 +2,16 @@ from __future__ import with_statement
 from gamestate import StateObject, stateVars, prescribedType, Link
 from stuffdb import itemDb
 
+def playerStartup(name, state):
+  plr = PlayerState()
+  state.spawn(plr)
+  inv = LinkList()
+  state.spawn(inv)
+  ite = ItemState()
+  state.spawn(ite)
+  inv.append(ite)
+  return plr
+
 class PlayerState(StateObject):
   typename = "pc"
   def __init__(self, data = None):

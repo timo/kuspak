@@ -12,7 +12,7 @@ TYPE_COMMAND = "C"
 TYPE_INFO  = "n"
 
 SHAKE_HELLO  = "h"
-SHAKE_SHIP   = "s"
+SHAKE_AUTH   = "a"
 SHAKE_YOURID = "i"
 
 INFO_PLAYERS = "p"
@@ -29,7 +29,7 @@ COMMAND_REPLACE = "r"
 
 class Client():
   def __init__(self):
-    self.shipid = None
+    self.stateid = None
     self.name = ""
     self.socket = None
     self.remote = True
@@ -37,21 +37,21 @@ class Client():
 
   def __repr__(self):
     if self.socket:
-      return "<Client %(name)s on %(addr)s%(remote)s with ship %(shipid)s>" % {\
+      return "<Client %(name)s on %(addr)s%(remote)s with ship %(stateid)s>" % {\
           'addr': str(self.socket.getpeername()),
           'remote': ["", " (remote)"][int(self.remote)],
-          'shipid': str(self.shipid) or "None",
+          'stateid': str(self.stateid) or "None",
           'name': self.name}
     else:
-      return "<Client %(name)s (socketless)%(remote)s with ship %(shipid)s>" % {\
+      return "<Client %(name)s (socketless)%(remote)s with ship %(stateid)s>" % {\
           'remote': ["", " (remote)"][int(self.remote)],
-          'shipid': str(self.shipid) or "None",
+          'stateid': str(self.stateid) or "None",
           'name': self.name}
       
 
 
 clients = {} # in server mode this is a dict of (addr, port) to Client
-             # in client mode this is a dict of shipid to Client
+             # in client mode this is a dict of stateid to Client
 
 conn = None # the server socket
 srvaddr = ("", 1)
@@ -76,10 +76,10 @@ def initServer(port):
   conn.setblocking(False)
 
   gs = GameState()
-  for i in range(1):
-    planet = PlanetState()
-    planet.position = [random() * 200 - 100, random() * 200 - 100]
-    gs.spawn(planet)
+  #for i in range(1):
+  #  planet = PlanetState()
+  #  planet.position = [random() * 200 - 100, random() * 200 - 100]
+  #  gs.spawn(planet)
 
   return gs
 
@@ -117,33 +117,27 @@ def initClient(addr, port):
     pass
 
   print "tickinterval is", main.tickinterval
-  
-  plp = ShipState() # proposed local player state
-  plp.position = [random() * 10., random() * 10.]
-  print "player position:", plp.position
-  plp.alignment = random()
 
-  mysend(conn, TYPE_SHAKE + SHAKE_SHIP + plp.serialize())
-  print "sent ship.", plp.serialize().__repr__()
+  mysend(conn, TYPE_SHAKE + SHAKE_AUTH + "passwd")
 
   gs = None
 
-  myshipid = None
-  while myshipid is None:
-    shipid = myrecv(conn)
-    if shipid[0] == TYPE_SHAKE and shipid[1] == SHAKE_YOURID:
-      myshipid = struct.unpack("!i", shipid[2:])[0]
+  mystateid = None
+  while mystateid is None:
+    stateid = myrecv(conn)
+    if stateid[0] == TYPE_SHAKE and stateid[1] == SHAKE_YOURID:
+      mystateid = struct.unpack("!i", stateid[2:])[0]
   
   while not gs:
     statemsg = myrecv(conn)
     if statemsg[0] == TYPE_STATE:
       gs = GameState(statemsg[1:])
     else:
-      print "oops. what?", shipid.__repr__()
+      print "oops. what?", stateid.__repr__()
 
   myself = Client()
   myself.name = gethostname()
-  myself.shipid = myshipid
+  myself.stateid = mystateid
   myself.remote = False
   clients[None] = myself
 
@@ -156,7 +150,7 @@ def sendChat(chat):
 
 def sendCmd(cmd):
   msg = struct.pack("!cic", TYPE_INPUT, main.gsh[-1].clock, cmd)
-  main.gsh.inject(clients[None].shipid, cmd)
+  main.gsh.inject(clients[None].stateid, cmd)
   mysend(conn, msg)
 
 def mysend(sock, data):
@@ -207,8 +201,8 @@ def pumpEvents():
           if type == TYPE_INPUT:
             type, clk, cmd = struct.unpack("!cic", msg)
 
-            main.gsh.inject(sender.shipid, cmd, clk)
-            dmsg = struct.pack("!ciic", type, clk, sender.shipid, cmd)
+            main.gsh.inject(sender.stateid, cmd, clk)
+            dmsg = struct.pack("!ciic", type, clk, sender.stateid, cmd)
 
 
             for sock in clients.keys():
@@ -225,24 +219,21 @@ def pumpEvents():
               mysend(sender.socket, TYPE_SHAKE + "tickinterval:" + str(main.tickinterval))
               print TYPE_SHAKE + "tickinterval:" + str(main.tickinterval)
               print clients
-            elif msg[1] == SHAKE_SHIP:
-              print "got a shake_ship."
+            elif msg[1] == SHAKE_AUTH:
+              print "got a shake_auth."
 
-              remoteship = ShipState(msg[2:])
+              a = stateobjects.playerStartup(sender.name, main.gsh[-1]
 
-              remoteship.team = nextTeam
-              nextTeam += 1
-              main.gsh[-1].spawn(remoteship)
-              sender.shipid = remoteship.id
+              sender.stateid = a.id
               print "sending a your-id-package"
-              mysend(sender.socket, TYPE_SHAKE + SHAKE_YOURID + struct.pack("!i", sender.shipid))
+              mysend(sender.socket, TYPE_SHAKE + SHAKE_YOURID + struct.pack("!i", sender.stateid))
               print "sent."
 
               print "sending the complete current gamestate"
               mysend(sender.socket, TYPE_STATE + main.gsh[-1].serialize())
 
               print "distributing a playerlist of", len(clients), "players."
-              msg = TYPE_INFO + INFO_PLAYERS + "".join(struct.pack("!i32s", c.shipid, c.name) for c in clients.values())
+              msg = TYPE_INFO + INFO_PLAYERS + "".join(struct.pack("!i32s", c.stateid, c.name) for c in clients.values())
               for dest in clients.keys():
                 mysend(dest, msg)
 
@@ -295,14 +286,14 @@ def pumpEvents():
             while data:
               nc = Client()
               chunk, data = data[:struct.calcsize("!i32s")], data[struct.calcsize("!i32s"):]
-              nc.shipid, nc.name = struct.unpack("!i32s", chunk)
+              nc.stateid, nc.name = struct.unpack("!i32s", chunk)
               nc.name = nc.name[:nc.name.find("\x00")]
-              nc.remote = nc.shipid != clients[None].shipid
+              nc.remote = nc.stateid != clients[None].stateid
               # we want our client as the None-client, so we reassign this here.
               if not nc.remote:
                 clients[None] = nc
               else:
-                clients[nc.shipid] = nc
+                clients[nc.stateid] = nc
 
             main.makePlayerList()
 

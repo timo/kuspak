@@ -11,6 +11,7 @@ from random import random
 from math import pi, sin, cos
 from socket import *
 from sys import argv
+import sys
 
 from timing import timer
 from gamestate import *
@@ -127,11 +128,11 @@ def rungame():
   if mode == "c":
     # this is used to fix the camera on the ship and display information about
     # his ship to the player.
-    myshipid = network.clients[None].shipid
+    mystateid = network.clients[None].shipid
     # a proxy is an object, that will automatically be updated by the gamestate
     # history object to always reflect the current object. This is accomplished
     # with black magic.
-    localplayer = gs.getById(myshipid).getProxy(gsh)
+    localplayer = gs.getById(mystateid).getProxy(gsh)
 
   # yay! play the game!
   

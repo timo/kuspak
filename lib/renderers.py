@@ -98,6 +98,4 @@ def renderPlanet(pla):
     for i in range(0, 360, 36):
       glVertex2f(sin(i / 180. * pi) * pla.size, cos(i / 180. * pi) * pla.size)
 
-methodMap = {gamestate.ShipState: renderShip,
-             gamestate.BulletState: renderBullet,
-             gamestate.PlanetState: renderPlanet}
+methodMap = {}
