@@ -150,7 +150,7 @@ def sendChat(chat):
   mysend(conn, msg)
 
 def sendCmd(cmd):
-  msg = struct.pack("!cic", TYPE_INPUT, main.gsh[-1].clock, cmd)
+  msg = struct.pack("!ci", TYPE_INPUT, main.gsh[-1].clock) + cmd
   main.gsh.inject(clients[None].stateid, cmd)
   mysend(conn, msg)
 
@@ -200,10 +200,10 @@ def pumpEvents():
             type = msg[0]
           else: continue
           if type == TYPE_INPUT:
-            type, clk, cmd = struct.unpack("!cic", msg)
+            type, clk, cmd = struct.unpack("!ci", msg[:5]) + (msg[5:],)
 
             main.gsh.inject(sender.stateid, cmd, clk)
-            dmsg = struct.pack("!ciic", type, clk, sender.stateid, cmd)
+            dmsg = struct.pack("!cii", type, clk, sender.stateid) + cmd
 
 
             for sock in clients.keys():
@@ -316,6 +316,7 @@ def pumpEvents():
             while data:
               objtype, data = data[:2], data[2:]
               obj = main.gsh[-1].getSerializeType(objtype)
+              print obj
               if obj == LinkList:
                 ln = struct.unpack("!2i", data[:8])[1] * 4 + 8
               else:

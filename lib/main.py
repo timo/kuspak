@@ -20,6 +20,8 @@ from font import Text
 from network import sendCmd
 import network
 
+from struct import pack, unpack
+
 # don't initialise sound stuff plzkthxbai
 pygame.mixer = None
 
@@ -191,9 +193,9 @@ def rungame():
       # player control stuff
       kp = pygame.key.get_pressed()
       if kp[K_LEFT]:
-        sendCmd("l")
-      if kp[K_RIGHT]:
-        sendCmd("r")
+        sendCmd("r" + pack("!i", 1))
+      #if kp[K_RIGHT]:
+      #  sendCmd("r")
       if kp[K_UP]:
         sendCmd("t")
       if kp[K_SPACE]:

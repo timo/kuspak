@@ -1,6 +1,7 @@
 from __future__ import with_statement
 from gamestate import GameState, StateObject, stateVars, prescribedType, Link, LinkList, typeKnowledgeBase
 from stuffdb import itemDb
+from struct import unpack
 
 def playerStartup(name, state):
   plr = state.spawn(PlayerState(state))
@@ -35,8 +36,24 @@ class PlayerState(StateObject):
   def collide(self, other, vec):
     pass
 
+  def posesses(self, other):
+    for it in self.items:
+      if it.id == other:
+        return True
+
+    return False
+
   def command(self, cmd):
-    pass
+    if cmd[0] == "r":   # read (a scroll or book)
+      if self.posesses(unpack("!i", cmd[1:])[0]):
+        print "reading it."
+      else:
+        print "can't read something that is not in your inventory"
+    #elif cmd[0] == "t": # target (for movement and attacks)
+    #elif cmd[0] == "e": # equip an item at a slot
+    #elif cmd[0] == "u": # unequip an item from a slot
+    #elif cmd[0] == "q": # quaff a potion
+    #elif cmd[0] == "c": # eat (citka) some food
 
 PlayerState(GameState())
 

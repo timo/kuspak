@@ -134,13 +134,16 @@ class GameState:
     if isinstance(dataFragment, str):
       try:
         return serializeKnowledgeBase[self.getSerializeType(dataFragment)]["len"]
-      except KeyError:
+      except KeyError, k:
         return struct.calcsize(self.getSerializeType(dataFragment).statevars_format)
     else:
       try:
         return struct.calcsize(dataFragment.statevars_format)
       except AttributeError:
-        raise Exception("getSerializedLen called on a LinkList?")
+        try:
+          return serializeKnowledgeBase[dataFragment]["len"]
+        except KeyError:
+          raise Exception("getSerializedLen called on a LinkList?")
 
   def deserialize(self, data):
     # deserialize the data
@@ -211,6 +214,7 @@ class GameState:
   def control(self, commands):
     # relays control messages to the objects.
     for id, cmd in commands:
+      print cmd
       self.getById(id).command(cmd)
 
   def __repr__(self):
@@ -371,6 +375,9 @@ class StateObjectProxy(object):
     else:
       self.objref.__setattr__(attr, value)
 
+  def __iter__(self):
+    return self.proxy_objref.__iter__()
+
   def __repr__(self):
     return "<Proxy of (%d): %s>" % (self.proxy_id, `self.proxy_objref`)
 
@@ -448,7 +455,8 @@ class LinkList(StateObject):
 
   def __getitem__(self, x): return self.links[x]
   def __delitem__(self, x): del self.links[x]
-  def append(self, v):  self.links.append(self.assureLink(v))
+  def __iter__(self):       return self.links.__iter__()
+  def append(self, v):      self.links.append(self.assureLink(v))
 
   def __repr__(self):
     return "<LinkList of %s>" % (`self.links`)
