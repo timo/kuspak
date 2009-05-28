@@ -109,7 +109,6 @@ class GameState:
     self.objects.append(object.bind(self))
     if not obvious:
       self.spawns.append(object)
-    print "spawned:", `object`
     return object
 
   def registerLink(self, link):
@@ -123,7 +122,6 @@ class GameState:
 
   def getSerializeType(self, dataFragment):
     type, data = dataFragment[:2], dataFragment[2:]
-    print `dataFragment`, `type`, `data`
     if type in typeKnowledgeBase:
       obj = typeKnowledgeBase[type]
     else:
@@ -156,7 +154,6 @@ class GameState:
     odata = data
     self.clock, data = struct.unpack("!i", data[:4])[0], data [4:]
     while len(data) > 0:
-      print "string is:", `data`
       obj = self.getSerializeType(data)
 
       # cut the next N bytes out of the data.
@@ -171,7 +168,6 @@ class GameState:
 
       obj = obj(self)
       try:
-        print "deserializing a", `obj`, "from", `objdat`
         obj.deserialize(objdat)
       except:
         print "could not deserialize", `odata`, "- chunk:", `objdat`
@@ -215,7 +211,6 @@ class GameState:
   def control(self, commands):
     # relays control messages to the objects.
     for id, cmd in commands:
-      print cmd
       self.getById(id).command(cmd)
 
   def __repr__(self):
@@ -439,7 +434,6 @@ class LinkList(StateObject):
     del self.links[:]
     while data:
       chunk, data = data[:4], data[4:]
-      print "adding", `chunk`
       self.work.append(lambda: self.links.append(Link(self.state.getById(struct.unpack("!i", chunk)[0]))))
 
   def pre_serialize(self): pass

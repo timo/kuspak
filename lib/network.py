@@ -216,7 +216,6 @@ def pumpEvents():
             main.gsh.inject(sender.stateid, cmd, clk)
             dmsg = struct.pack("!cii", type, clk, sender.stateid) + cmd
 
-
             for sock in clients.keys():
               if sock != sender.socket:
                 mysend(sock, dmsg)
@@ -229,8 +228,6 @@ def pumpEvents():
               sender.name = msg[2:msg.find("\x00")]
 
               mysend(sender.socket, TYPE_SHAKE + "tickinterval:" + str(main.tickinterval))
-              print TYPE_SHAKE + "tickinterval:" + str(main.tickinterval)
-              print clients
             elif msg[1] == SHAKE_AUTH:
               print "got a shake_auth."
 
@@ -239,7 +236,6 @@ def pumpEvents():
               sender.stateid = a.id
               print "sending a your-id-package"
               mysend(sender.socket, TYPE_SHAKE + SHAKE_YOURID + struct.pack("!i", sender.stateid))
-              print "sent."
 
               print "sending the complete current gamestate"
               mysend(sender.socket, TYPE_STATE + main.gsh[-1].serialize())
@@ -266,7 +262,6 @@ def pumpEvents():
 
     main.gsh.apply()
     if main.gsh[-2].spawns:
-      print "sending a spawn package:", main.gsh[-2].spawns, "for clock", main.gsh[-2].clock
       msg = TYPE_COMMAND + COMMAND_SPAWN + struct.pack("!i", main.gsh[-2].clock) + "".join([spawned.typename + spawned.serialize() for spawned in main.gsh[-2].spawns])
       for dest in clients.values():
         mysend(dest.socket, msg)
@@ -320,26 +315,21 @@ def pumpEvents():
             main.updateChatLog()
         elif data[0] == TYPE_COMMAND:
           if data[1] == COMMAND_SPAWN:
-            print "got a spawn command", data.__repr__()
             dat = data[2:]
             clock, data = struct.unpack("!i", dat[:4])[0], dat[4:]
             
             while data:
               objtype, data = data[:2], data[2:]
               obj = main.gsh[-1].getSerializeType(objtype)
-              print obj
               if obj == LinkList:
                 ln = struct.unpack("!2i", data[:8])[1] * 4 + 8
               else:
                 ln = main.gsh[-1].getSerializedLen(obj)
               objdat, data = data[:ln], data[ln:]
-              print "trying to spawn:", objdat.__repr__(), "at", clock
               found = main.gsh.byClock(clock)
               obj = obj(main.gsh[found], objdat)
-              print "got obj with id", obj.id
               try:
                 if main.gsh[-1].getById(obj.id): 
-                  print "already taken. updating..."
                   main.gsh.updateObject(obj.id, objdat, clock)
               except NotFound:
                 main.gsh.injectObject(obj, clock)
