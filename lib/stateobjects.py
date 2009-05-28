@@ -28,7 +28,7 @@ class PlayerState(StateObject):
       self.deserialize(data)
 
   def __repr__(self):
-    return "<PlayerState H%f/%d M%f/%d holding %s>" % (self.health, self.maxHealth, self.magic, self.maxMagic, `self.items`)
+    return "<PlayerState at (%d, %d) H%f/%d M%f/%d holding %s with intrinsics %s>" % (self.position[0], self.position[1], self.health, self.maxHealth, self.magic, self.maxMagic, `self.items`, `self.intrins`)
 
   def tick(self, dt):
     pass

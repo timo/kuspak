@@ -5,7 +5,7 @@ from OpenGL.GL import *
 class Texture:
   def __init__(self, texturename):
     self.name = texturename
-    self.Surface = pygame.image.load('data/gfx/%s.png' % texturename)
+    self.Surface = pygame.image.load('assets/gfx/%s.png' % texturename)
 
     (self.w, self.h) = self.Surface.get_rect()[2:]
 

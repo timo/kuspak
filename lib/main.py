@@ -4,6 +4,7 @@ from __future__ import with_statement
 import pygame
 from pygame.locals import *
 from OpenGL.GL import *
+from OpenGL.GLU import gluPerspective, gluLookAt
 from with_opengl import glMatrix, glIdentityMatrix, glPrimitive
 
 from time import sleep
@@ -15,7 +16,7 @@ import sys
 
 from timing import timer
 from gamestate import *
-import renderers
+from renderers import *
 from font import Text
 from network import sendCmd
 import network
@@ -39,12 +40,7 @@ sets the resolution and sets up the projection matrix"""
   glViewport(0, 0, width, height)
   glMatrixMode(GL_PROJECTION)
   glLoadIdentity()
-  glOrtho(0, 50, 37, 0, -10, 10) # those are resolution-independent to be fair
-  #     x
-  #  0---->
-  #  |
-  # y|
-  #  v
+  gluPerspective(45, width / height * 1.0, 1, 50)
   glMatrixMode(GL_MODELVIEW)
   glLoadIdentity()
 
@@ -102,6 +98,7 @@ def rungame():
 
   if mode == "c":
     init()
+    loadImagery()
   
   if mode == "s": # in server mode
     gs = network.initServer(int(port))
@@ -209,10 +206,10 @@ def rungame():
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
         with glIdentityMatrix():
           # put the player in the middle of the screen
-          glTranslatef(25 - localplayer.position[0], 18.5 - localplayer.position[1], 0)
+          gluLookAt(1, 1, 10, 0, 0, 0, 0, 0, 1)
           # render everything
-          renderers.renderGameGrid(localplayer)
-          renderers.renderWholeState(gsh[-1])
+          renderGameGrid(localplayer)
+          renderWholeState(gsh[-1])
 
         with glIdentityMatrix():
           glScalef(1./32, 1./32, 1)
