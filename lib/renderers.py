@@ -38,6 +38,7 @@ def renderGameGrid(player):
         glColor(0.05, 0.05, 0)
       glVertex2f(player.position[0] - 30, y)
       glVertex2f(player.position[0] + 30, y)
+  glColor(1.0, 1.0, 1.0)
 
 
 def renderWholeState(state):
@@ -47,8 +48,12 @@ def renderWholeState(state):
         with glMatrix():
           met(obj)
 
+playerflags = {}
+
 def renderPlayer(player):
   glTranslate(*player.position + [0])
+  glTranslate(-0.5, 0, 1)
+  glRotatef(90, -1, 0, 0)
   with glMatrix():
     glEnable(GL_TEXTURE_2D)
     Texture("person").bind()
@@ -65,11 +70,11 @@ def renderPlayer(player):
   tryfind = [c for c in network.clients.values() if c.stateid == player.id and c.remote]
   if tryfind:
     glEnable(GL_TEXTURE_2D)
-    if tryfind[0] not in shipflags:
+    if tryfind[0] not in playerflags:
       txt = Text(tryfind[0].name)
-      shipflags[tryfind[0]] = txt
+      playerflags[tryfind[0]] = txt
     else:
-      txt = shipflags[tryfind[0]]
+      txt = playerflags[tryfind[0]]
     glTranslate(1.5, 0, 0)
     glScale(0.05,0.05,1)
     txt.draw()

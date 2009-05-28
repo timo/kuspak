@@ -147,6 +147,9 @@ def rungame():
   # from the server is received.
   catchUpAccum = 0
 
+  cam_h = 10
+  cam_v = 10
+
   if mode == "c":
     playerlist = []
     makePlayerList()
@@ -190,13 +193,13 @@ def rungame():
       # player control stuff
       kp = pygame.key.get_pressed()
       if kp[K_LEFT]:
-        sendCmd("r" + pack("!i", 1))
-      #if kp[K_RIGHT]:
-      #  sendCmd("r")
+        cam_h -= 1
+      if kp[K_RIGHT]:
+        cam_h += 1
       if kp[K_UP]:
-        sendCmd("t")
-      if kp[K_SPACE]:
-        sendCmd("f")
+        cam_v += 1
+      if kp[K_DOWN]:
+        cam_v -= 1
       # end player control stuff
 
       catchUpAccum += timer.catchUp
@@ -206,7 +209,7 @@ def rungame():
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
         with glIdentityMatrix():
           # put the player in the middle of the screen
-          gluLookAt(1, 1, 10, 0, 0, 0, 0, 0, 1)
+          gluLookAt(cam_h, cam_v, 10, localplayer.position[0], localplayer.position[1], 0, 0, 0, 1)
           # render everything
           renderGameGrid(localplayer)
           renderWholeState(gsh[-1])
