@@ -37,14 +37,17 @@ class Client():
     self.sender = ()
 
   def __repr__(self):
-    if self.socket:
-      return "<Client %(name)s on %(addr)s%(remote)s with ship %(stateid)s>" % {\
-          'addr': str(self.socket.getpeername()),
-          'remote': ["", " (remote)"][int(self.remote)],
-          'stateid': str(self.stateid) or "None",
-          'name': self.name}
-    else:
-      return "<Client %(name)s (socketless)%(remote)s with ship %(stateid)s>" % {\
+    try:
+      if self.socket:
+        return "<Client %(name)s on %(addr)s%(remote)s controlling %(stateid)s>" % {\
+            'addr': str(self.socket.getpeername()),
+            'remote': ["", " (remote)"][int(self.remote)],
+            'stateid': str(self.stateid) or "None",
+            'name': self.name}
+      else:
+        raise Exception
+    except:
+      return "<Client %(name)s (socketless)%(remote)s controlling %(stateid)s>" % {\
           'remote': ["", " (remote)"][int(self.remote)],
           'stateid': str(self.stateid) or "None",
           'name': self.name}
@@ -194,7 +197,14 @@ def pumpEvents():
 
         readysock = select(clients.keys(), (), (), 0)[0]
         receiving = bool(readysock)
-        stuff = [(myrecv(sock), clients[sock]) for sock in readysock]
+        stuff = []
+        for sock in readysock:
+          try:
+            stuff.append((myrecv(sock), clients[sock]))
+          except error, e:
+            if e.args[0] == 104: # connection reset by peer.
+              print "client", clients[sock], "dropped out. removing it."
+              del clients[sock]
         for msg, sender in stuff:
           if msg:
             type = msg[0]
@@ -266,7 +276,7 @@ def pumpEvents():
         mysend(dest.socket, msg)
 
   elif mode == "c":
-    receiving = select([conn], (), (), 0)[0]
+    receiving = True
     while receiving:
       receiving = select([conn], (), (), 0)[0]
       try:
