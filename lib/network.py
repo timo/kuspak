@@ -204,6 +204,7 @@ def pumpEvents():
           except error, e:
             if e.args[0] == 104: # connection reset by peer.
               print "client", clients[sock], "dropped out. removing it."
+              main.gsh[-1].getById(clients[sock].stateid).die = True
               del clients[sock]
         for msg, sender in stuff:
           if msg:

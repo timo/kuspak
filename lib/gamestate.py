@@ -94,6 +94,7 @@ class GameState:
     for o in self.objects:
       o.tick(self.tickinterval)
       if o.die:
+        o.state = None
         self.objects.remove(o)
 
     self.doCollisions(self.tickinterval)
