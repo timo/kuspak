@@ -19,27 +19,18 @@ def frange(start, end, step):
   yield end
 
 def renderGameGrid(player):
-  with glPrimitive(GL_LINES):
-    for x in range(int(player.position[0] - 30), int(player.position[0] + 30), 1):
-      if x % 10 == 0:
-        glColor(0.3, 0.3, 0, 1)
-      elif x % 10 == 5:
-        glColor(0.15, 0.15, 0, 1)
-      else:
-        glColor(0.05, 0.05, 0, 1)
-      glVertex2f(x, player.position[1] - 30)
-      glVertex2f(x, player.position[1] + 30)
-    for y in range(int(player.position[1] - 30), int(player.position[1] + 30), 1):
-      if y % 10 == 0:
-        glColor(0.3, 0.3, 0)
-      elif y % 10 == 5:
-        glColor(0.15, 0.15, 0)
-      else:
-        glColor(0.05, 0.05, 0)
-      glVertex2f(player.position[0] - 30, y)
-      glVertex2f(player.position[0] + 30, y)
-  glColor(1.0, 1.0, 1.0)
-
+  with glMatrix():
+    #glTranslatef(player.position[0], player.position[1], 0)
+    Texture("floor").bind()
+    with glPrimitive(GL_QUADS):
+      glTexCoord2f(0, 0)
+      glVertex2f(-100, -100)
+      glTexCoord2f(100, 0)
+      glVertex2f(100, -100)
+      glTexCoord2f(100, 100)
+      glVertex2f(100, 100)
+      glTexCoord2f(0, 100)
+      glVertex2f(-100, 100)
 
 def renderWholeState(state):
   for obj in state.objects:
@@ -55,7 +46,6 @@ def renderPlayer(player):
   glTranslate(-0.5, 0, 1)
   glRotatef(90, -1, 0, 0)
   with glMatrix():
-    glEnable(GL_TEXTURE_2D)
     Texture("person").bind()
     with glPrimitive(GL_QUADS):
       glTexCoord2f(0, 0)
@@ -69,7 +59,6 @@ def renderPlayer(player):
 
   tryfind = [c for c in network.clients.values() if c.stateid == player.id and c.remote]
   if tryfind:
-    glEnable(GL_TEXTURE_2D)
     if tryfind[0] not in playerflags:
       txt = Text(tryfind[0].name)
       playerflags[tryfind[0]] = txt
@@ -78,7 +67,6 @@ def renderPlayer(player):
     glTranslate(1.5, 0, 0)
     glScale(0.05,0.05,1)
     txt.draw()
-    glDisable(GL_TEXTURE_2D)
 
 def loadImagery():
   print "loading imagery:"

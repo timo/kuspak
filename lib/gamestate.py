@@ -211,7 +211,10 @@ class GameState:
   def control(self, commands):
     # relays control messages to the objects.
     for id, cmd in commands:
-      self.getById(id).command(cmd)
+      try:
+        self.getById(id).command(cmd)
+      except NotFound:
+        print "could not control", id, "with command", `cmd`, "at tick", self.tick
 
   def __repr__(self):
     return "<GameState at clock %d containing: %s>" % (self.clock, `self.objects`)

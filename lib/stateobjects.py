@@ -2,6 +2,7 @@ from __future__ import with_statement
 from gamestate import GameState, StateObject, stateVars, prescribedType, Link, LinkList, typeKnowledgeBase
 from stuffdb import itemDb
 from struct import unpack
+from math import *
 
 def playerStartup(name, state):
   plr = state.spawn(PlayerState(state))
@@ -14,6 +15,7 @@ class PlayerState(StateObject):
     StateObject.__init__(self, state)
     with stateVars(self):
       self.position = [0.0, 0.0]
+      self.target = [0.0, 0.0]
       self.alignment = 0.0         # from 0 to 1
       self.health = 20.0
       self.maxHealth = 20
@@ -31,7 +33,13 @@ class PlayerState(StateObject):
     return "<PlayerState at (%d, %d) H%f/%d M%f/%d holding %s with intrinsics %s>" % (self.position[0], self.position[1], self.health, self.maxHealth, self.magic, self.maxMagic, `self.items`, `self.intrins`)
 
   def tick(self, dt):
-    pass
+    dv = [self.target[i] - self.position[i] for i in range(2)]
+    if not (abs(dv[0]) <= 0.1 and abs(dv[1]) <= 0.1):
+      ln = sqrt(dv[0] * dv[0] + dv[1] * dv[1])
+      if ln < dt * 0.01:
+        self.position = list(self.target)
+      else:
+        self.position = [self.position[i] + (dv[i] / ln) * dt * 0.01 for i in range(2)]
 
   def collide(self, other, vec):
     pass
@@ -49,7 +57,8 @@ class PlayerState(StateObject):
         print "reading it."
       else:
         print "can't read something that is not in your inventory"
-    #elif cmd[0] == "t": # target (for movement and attacks)
+    elif cmd[0] == "t": # target (for movement and attacks)
+      self.target = unpack("!dd", cmd[1:])
     #elif cmd[0] == "e": # equip an item at a slot
     #elif cmd[0] == "u": # unequip an item from a slot
     #elif cmd[0] == "q": # quaff a potion

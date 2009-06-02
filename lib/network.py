@@ -280,7 +280,8 @@ def pumpEvents():
         if not data:
           continue
         elif data[0] == TYPE_INPUT:
-            clk, id, cmd = struct.unpack("!iic", data[1:])
+            clk, id = struct.unpack("!ii", data[1:9])
+            cmd = data[9:]
 
             main.gsh.inject(id, cmd, clk)
         elif data[0] == TYPE_STATE:

@@ -4,7 +4,7 @@ from __future__ import with_statement
 import pygame
 from pygame.locals import *
 from OpenGL.GL import *
-from OpenGL.GLU import gluPerspective, gluLookAt
+from OpenGL.GLU import gluPerspective, gluLookAt, gluUnProject
 from with_opengl import glMatrix, glIdentityMatrix, glPrimitive
 
 from time import sleep
@@ -28,6 +28,7 @@ pygame.mixer = None
 
 screen = None
 screensize = (800, 600)
+scene_matrix = []
 
 gsh = None # this will hold a Gamestate History object.
 tickinterval = 0
@@ -53,30 +54,37 @@ def init():
   # some OpenGL magic!
   glEnable(GL_BLEND)
   glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+  glEnable(GL_DEPTH_TEST)
+  glDepthFunc(GL_LEQUAL)
   glEnable(GL_TEXTURE_2D)
   glClearColor(0.1,0.1,0.0,1.0)
 
 def makePlayerList():
   global playerlist
   # the "playerlist" is actually a list of Text objects that will just be rendered underneith each other.
-  glEnable(GL_TEXTURE_2D) # without textures enabled, the texture data cannot be loaded.
   playerlist = [Text("Players:")] + [Text(c.name) for c in network.clients.values()]
-  glDisable(GL_TEXTURE_2D)
 
 chatitems = []
 
 def updateChatLog():
   global chatitems
   # similar to the makePlayerList function
-  glEnable(GL_TEXTURE_2D)
   chatitems = [Text(txt) for txt in network.chatlog[-10:]]
-  glDisable(GL_TEXTURE_2D)
+
+def pickFloor(x, y):
+  viewp = (0, 0) + screensize
+  mat = glGetDoublev(GL_PROJECTION_MATRIX)
+  p1 = gluUnProject(x, viewp[3] - y, 0.0, scene_matrix, mat, viewp)
+  p2 = gluUnProject(x, viewp[3] - y, 1.0, scene_matrix, mat, viewp)
+  ln = -1 * p1[2] / (p2[2] - p1[2])
+  return [p1[0] + (p2[0] - p1[0]) * ln, p1[1] + (p2[1] - p1[1]) * ln]
 
 def rungame():
   global gsh
   global tickinterval
   global playerlist
   global chatitems
+  global scene_matrix
 
   tickinterval = 50
 
@@ -158,9 +166,9 @@ def rungame():
     textthing = Text(sentence)
 
     def updateTextThing():
-      glEnable(GL_TEXTURE_2D)
       textthing.renderText(sentence)
-      glDisable(GL_TEXTURE_2D)
+
+  pick = [0, 0]
 
   while running:
     timer.startFrame()
@@ -169,7 +177,13 @@ def rungame():
         if event.type == QUIT:
           running = False
 
-        if event.type == KEYDOWN:
+        elif event.type == MOUSEMOTION:
+          try:
+            pick = pickFloor(*event.pos)
+          except: pass
+        elif event.type == MOUSEBUTTONDOWN:
+          sendCmd("t" + pack("!dd", *pick))
+        elif event.type == KEYDOWN:
           if event.key == K_ESCAPE:
             running = False
 
@@ -210,9 +224,18 @@ def rungame():
         with glIdentityMatrix():
           # put the player in the middle of the screen
           gluLookAt(cam_h, cam_v, 10, localplayer.position[0], localplayer.position[1], 0, 0, 0, 1)
+          scene_matrix = glGetDoublev(GL_MODELVIEW_MATRIX)
           # render everything
-          renderGameGrid(localplayer)
-          renderWholeState(gsh[-1])
+          with glMatrix():
+            renderGameGrid(localplayer)
+            renderWholeState(gsh[-1])
+
+          with glMatrix():
+            glDisable(GL_TEXTURE_2D)
+            with glPrimitive(GL_LINES):
+              glVertex(pick[0], pick[1], 4)
+              glVertex(pick[0], pick[1], -4)
+            glEnable(GL_TEXTURE_2D)
 
         with glIdentityMatrix():
           glScalef(1./32, 1./32, 1)
@@ -228,7 +251,6 @@ def rungame():
             for msg in [textthing] + chatitems[::-1]:
               msg.draw()
               glTranslate(0, -17, 0)
-          glDisable(GL_TEXTURE_2D)
 
         pygame.display.flip()
 
